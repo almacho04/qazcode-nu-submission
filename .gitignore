@@ -217,3 +217,10 @@ __marimo__/
 # Mac OS
 .DS_Store
 **/.DS_Store
+
+# local eval outputs
+data/evals/
+
+# local debug scripts
+debug*.py
+check_fields.py
