@@ -10,5 +10,11 @@ dependencies = [
     "aiohttp>=3.9.0",
     "fastapi>=0.115.0",
     "uvicorn>=0.32.0",
-    "ipykernel>=7.2.0"
+    "ipykernel>=7.2.0",
+    "python-dotenv>=1.2.1",
+    "sentence-transformers>=5.2.3",
+    "qdrant-client>=1.17.0",
+    "rank-bm25>=0.2.2",
+    "numpy>=2.4.2",
+    "openai>=2.21.0",
 ]

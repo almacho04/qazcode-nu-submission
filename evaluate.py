@@ -26,7 +26,7 @@ from rich.text import Text
 class EvaluationResult:
     protocol_id: str
     accuracy_at_1: int  # 1 or 0
-    recall_at_3: int  # 1 or 0
+    recall_at_3: int    # 1 or 0
     latency_s: float
     ground_truth: str
     top_prediction: str
@@ -92,6 +92,7 @@ async def run_evaluation(
     endpoint: str,
     dataset_dir: Path,
     parallelism: int,
+    limit: int = None,          # ← NEW: optional file limit
 ) -> list[EvaluationResult]:
     """Run evaluation on all JSON files in the dataset directory."""
     console = Console()
@@ -101,12 +102,19 @@ async def run_evaluation(
         console.print(f"[red]No JSON files found in {dataset_dir}[/red]")
         return []
 
+    # ↓ NEW: truncate file list if --limit is set
+    # OLD: (no limit was applied)
+    if limit:
+        json_files = json_files[:limit]
+
     console.print(
         Panel(
             f"[bold cyan]Diagnostic Accuracy Evaluation[/bold cyan]\n\n"
             f"Endpoint: [yellow]{endpoint}[/yellow]\n"
             f"Dataset: [yellow]{dataset_dir}[/yellow]\n"
-            f"Files: [yellow]{len(json_files)}[/yellow]\n"
+            f"Files: [yellow]{len(json_files)}[/yellow]"
+            # ↓ NEW: show limit info if active
+            + (f" [dim](limited from full set)[/dim]" if limit else "") + "\n"
             f"Parallelism: [yellow]{parallelism}[/yellow]",
             title="[bold white]Configuration[/bold white]",
             border_style="cyan",
@@ -229,7 +237,6 @@ def display_summary(
         console.print("[red]No results to display[/red]")
         return
 
-    # Metrics table
     metrics_table = Table(
         title="[bold]Evaluation Metrics[/bold]",
         show_header=True,
@@ -245,7 +252,6 @@ def display_summary(
         "Total Protocols", f"[bold white]{metrics['total_protocols']}[/bold white]"
     )
 
-    # Latency table
     latency_table = Table(
         title="[bold]Latency Statistics[/bold]",
         show_header=True,
@@ -281,42 +287,48 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python main.py --endpoint http://localhost:8000/diagnose --dataset-dir ./data --name my_submission
-  python main.py -e http://api.example.com/diagnose -d ./protocols -n team_alpha -p 10
+  # Quick 30-file test
+  python evaluate.py -e http://localhost:8080/diagnose -d ./data/test_set -n quick_test -l 30
+
+  # Full 221-file evaluation
+  python evaluate.py -e http://localhost:8080/diagnose -d ./data/test_set -n Assentay
         """,
     )
     parser.add_argument(
-        "-n",
-        "--name",
+        "-n", "--name",
         required=True,
-        help="Submission/project name (used for output file naming)",
+        help="Submission name (used for output file naming)",
     )
     parser.add_argument(
-        "-e",
-        "--endpoint",
+        "-e", "--endpoint",
         required=True,
         help="URL of the diagnostic endpoint",
     )
     parser.add_argument(
-        "-d",
-        "--dataset-dir",
+        "-d", "--dataset-dir",
         required=True,
         type=Path,
         help="Directory containing JSON protocol files",
     )
     parser.add_argument(
-        "-p",
-        "--parallelism",
+        "-p", "--parallelism",
         type=int,
         default=2,
         help="Number of simultaneous requests (default: 2)",
     )
     parser.add_argument(
-        "-o",
-        "--output-dir",
+        "-o", "--output-dir",
         type=Path,
         default=Path("data/evals"),
         help="Output directory for results (default: data/evals)",
+    )
+    # ↓ NEW: limit argument
+    # OLD: (did not exist — always ran all 221 files)
+    parser.add_argument(
+        "-l", "--limit",
+        type=int,
+        default=None,
+        help="Limit number of test files, e.g. 30 for a quick run (default: all files)",
     )
 
     args = parser.parse_args()
@@ -334,17 +346,20 @@ Examples:
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
+    # ↓ NEW: pass limit to run_evaluation
+    # OLD: run_evaluation(endpoint=..., dataset_dir=..., parallelism=...)
     results = asyncio.run(
         run_evaluation(
             endpoint=args.endpoint,
             dataset_dir=args.dataset_dir,
             parallelism=args.parallelism,
+            limit=args.limit,           # ← NEW
         )
     )
 
     if results:
         output_jsonl = args.output_dir / f"{args.name}.jsonl"
-        output_json = args.output_dir / f"{args.name}_metrics.json"
+        output_json  = args.output_dir / f"{args.name}_metrics.json"
 
         write_jsonl(results, output_jsonl)
         metrics = compute_metrics(results)

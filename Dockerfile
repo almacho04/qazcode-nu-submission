@@ -8,9 +8,12 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
 COPY src/ ./src/
+# IMPORTANT: include your indexes/corpus if your app needs them at runtime:
+COPY data/ ./data/
+COPY corpus/ ./corpus/
 
 ENV PYTHONUNBUFFERED=1
 
-EXPOSE 8000
+EXPOSE 8080
 
-CMD ["uv", "run", "uvicorn", "src.mock_server:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "uvicorn", "src.server:app", "--host", "0.0.0.0", "--port", "8080"]
